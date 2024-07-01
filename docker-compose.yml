@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: sh ./run_web.sh
+    restart: unless-stopped
+    volumes:
+      - .:/code
+    ports:
+      - "${DJANGO_PORT}:${DJANGO_PORT}"
+    env_file:
+      - .env
+    depends_on:
+      - db
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${SQL_USER}
+      - POSTGRES_PASSWORD=${SQL_PASSWORD}
+      - POSTGRES_DB=${SQL_DATABASE}
+    ports:
+      - "${SQL_PORT}:${SQL_PORT}"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${SQL_USER} -d ${SQL_DATABASE}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  rabbit:
+    hostname: ${RABBITMQ_HOST}
+    image: rabbitmq:3-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST}
+    ports:
+      - "${RABBITMQ_PORT}:${RABBITMQ_PORT}"
+  celery:
+    build: .
+    command: sh ./run_celery.sh
+    volumes:
+      - .:/code
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - rabbit
+
+
+volumes:
+  postgres_data:
